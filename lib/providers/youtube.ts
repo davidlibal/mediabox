@@ -1,6 +1,13 @@
 import ytdl from "@distube/ytdl-core";
 import type { Provider } from "./types";
 
+// Vercel's serverless functions run on a read-only filesystem. ytdl-core
+// tries to write debug/update files to disk by default, which throws
+// (EROFS) instead of just warning. Both env vars must be set before any
+// ytdl call to avoid that crash.
+process.env.YTDL_NO_UPDATE = "1";
+process.env.YTDL_NO_DEBUG_FILE = "1";
+
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
