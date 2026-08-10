@@ -17,6 +17,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const meta = await provider.analyze(url);
-  return NextResponse.json({ provider: provider.id, meta });
+  try {
+    const meta = await provider.analyze(url);
+    return NextResponse.json({ provider: provider.id, meta });
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Não foi possível analisar esse link agora. Tente novamente.";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 }
