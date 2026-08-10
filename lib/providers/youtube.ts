@@ -51,7 +51,8 @@ export const youtubeProvider: Provider = {
     let info: ytdl.videoInfo;
     try {
       info = await ytdl.getInfo(url);
-    } catch {
+    } catch (err) {
+      console.error("ytdl.getInfo failed:", err);
       throw new Error(
         "Não foi possível obter os dados deste vídeo agora. Ele pode ser privado, restrito ou estar indisponível."
       );
