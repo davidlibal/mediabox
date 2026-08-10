@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+:root {
+  /* Surfaces — dark mode depth, never pure black */
+  --color-background: #0a0b0d;
+  --color-surface: #121417;
+  --color-surface-elevated: #17191d;
+  --color-surface-hover: #1c1f24;
+  --color-border: #24272c;
+  --color-border-strong: #33373d;
+
+  /* Text */
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #a4a9b1;
+  --color-text-muted: #6b6f77;
+
+  /* Brand accent — single signal color */
+  --color-accent: #6e5bff;
+  --color-accent-hover: #7d6bff;
+  --color-accent-muted: #6e5bff1a;
+
+  /* Semantic */
+  --color-success: #34d399;
+  --color-warning: #f5a623;
+  --color-error: #f2545b;
+  --color-info: #4c7eff;
+
+}
+
+@theme inline {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-muted: var(--color-accent-muted);
+
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-info: var(--color-info);
+
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-fade-in: fade-in 0.4s ease-out;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+/* Subtle grain + radial glow backdrop — decoration stays behind content */
+.mb-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% -10%, color-mix(in oklab, var(--color-accent) 14%, transparent), transparent 70%),
+    radial-gradient(40% 35% at 85% 15%, color-mix(in oklab, var(--color-accent) 8%, transparent), transparent 70%);
+}
+
+.mb-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--color-border) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-border) 60%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(60% 60% at 50% 0%, black, transparent 75%);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
+
+* {
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
