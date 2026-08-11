@@ -1,6 +1,9 @@
 import type { DownloadTarget, Provider } from "./types";
 
-const INSTAGRAM_URL_PATTERN = /instagram\.com\/(p|reel|tv)\/([A-Za-z0-9_-]+)/i;
+// Matches both standalone share links (instagram.com/reel/{code}/) and
+// profile-scoped links (instagram.com/{username}/reel/{code}/) — Instagram
+// generates both formats depending on where the link is copied from.
+const INSTAGRAM_URL_PATTERN = /instagram\.com\/(?:[^/?#]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)/i;
 
 function extractShortcode(url: string): string | null {
   const match = url.match(INSTAGRAM_URL_PATTERN);
