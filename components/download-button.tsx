@@ -3,21 +3,37 @@
 import { useState } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 
-/**
- * Mock download action: no real file exists yet (providers land in a later phase),
- * so this only reflects success in the UI instead of faking a binary download.
- */
+type DownloadButtonProps = ButtonProps & {
+  doneLabel?: string;
+  /** Object URL (or direct URL) of the already-fetched file to save. */
+  href?: string;
+  /** File name used for the browser's save dialog. */
+  downloadName?: string;
+};
+
 export function DownloadButton({
   children,
   doneLabel = "Baixado",
+  href,
+  downloadName,
+  onClick,
   ...props
-}: ButtonProps & { doneLabel?: string }) {
+}: DownloadButtonProps) {
   const [done, setDone] = useState(false);
 
   return (
     <Button
       {...props}
-      onClick={() => {
+      onClick={(event) => {
+        if (href) {
+          const link = document.createElement("a");
+          link.href = href;
+          link.download = downloadName ?? "";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        onClick?.(event);
         setDone(true);
         window.setTimeout(() => setDone(false), 2000);
       }}
