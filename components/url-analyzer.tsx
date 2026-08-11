@@ -21,10 +21,29 @@ type AnalyzeMeta = {
   formats: string[];
 };
 
+type DownloadResult = {
+  fileName: string;
+  size: string;
+  blobUrl: string;
+};
+
 const glyphs: Record<Platform, (props: { className?: string }) => React.JSX.Element> = {
   youtube: YoutubeGlyph,
   instagram: InstagramGlyph,
 };
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, exponent);
+  return `${exponent === 0 ? value : value.toFixed(1)} ${units[exponent]}`;
+}
+
+function extractFileName(contentDisposition: string | null, fallback: string): string {
+  const match = contentDisposition?.match(/filename="([^"]+)"/);
+  return match?.[1] ?? fallback;
+}
 
 export function UrlAnalyzer() {
   const [url, setUrl] = useState("");
@@ -33,7 +52,8 @@ export function UrlAnalyzer() {
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<Platform | null>(null);
   const [meta, setMeta] = useState<AnalyzeMeta | null>(null);
-  const [result, setResult] = useState<{ fileName: string; size: string } | null>(null);
+  const [result, setResult] = useState<DownloadResult | null>(null);
+  const [processError, setProcessError] = useState<string | null>(null);
 
   const hinted = useMemo(() => detectPlatform(url), [url]);
 
@@ -65,20 +85,38 @@ export function UrlAnalyzer() {
   async function handleProcess() {
     if (!provider || !meta) return;
     setStage("processing");
-    const res = await fetch("/api/download", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider, format: meta.formats[format] }),
-    });
-    const data = await res.json();
-    setResult(data);
-    setStage("ready");
+    setProcessError(null);
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, format: meta.formats[format] }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setProcessError(data?.error ?? "Não foi possível preparar o download agora. Tente novamente.");
+        setStage("result");
+        return;
+      }
+
+      const blob = await res.blob();
+      const fileName = extractFileName(res.headers.get("content-disposition"), "arquivo");
+      const blobUrl = URL.createObjectURL(blob);
+      setResult({ fileName, size: formatBytes(blob.size), blobUrl });
+      setStage("ready");
+    } catch {
+      setProcessError("Falha ao conectar. Tente novamente.");
+      setStage("result");
+    }
   }
 
   function reset() {
+    if (result?.blobUrl) URL.revokeObjectURL(result.blobUrl);
     setStage("idle");
     setUrl("");
     setError(null);
+    setProcessError(null);
     setProvider(null);
     setMeta(null);
     setResult(null);
@@ -177,6 +215,8 @@ export function UrlAnalyzer() {
                   disabled={stage === "processing"}
                 />
 
+                {processError && <p className="text-xs text-error">{processError}</p>}
+
                 <div className="mt-3 flex items-center gap-3">
                   <Button onClick={handleProcess} disabled={stage === "processing"}>
                     {stage === "processing" ? "Processando..." : "Processar"}
@@ -207,7 +247,9 @@ export function UrlAnalyzer() {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <DownloadButton>Baixar arquivo</DownloadButton>
+                <DownloadButton href={result?.blobUrl} downloadName={result?.fileName}>
+                  Baixar arquivo
+                </DownloadButton>
                 <Link href="/converter">
                   <Button variant="secondary">Converter arquivo</Button>
                 </Link>
