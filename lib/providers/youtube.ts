@@ -1,5 +1,5 @@
 import ytdl from "@distube/ytdl-core";
-import type { Provider } from "./types";
+import type { DownloadTarget, Provider } from "./types";
 
 // Vercel's serverless functions run on a read-only filesystem. ytdl-core
 // tries to write debug/update files to disk by default, which throws
@@ -64,6 +64,78 @@ async function analyzeViaOEmbed(url: string) {
   };
 }
 
+const EXTENSION_BY_MIME_TYPE: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "audio/mp4": "m4a",
+  "audio/webm": "webm",
+};
+
+function inferExtension(mimeType: string | undefined, fallback: string): string {
+  if (!mimeType) return fallback;
+  const type = mimeType.split(";")[0]?.trim();
+  return EXTENSION_BY_MIME_TYPE[type ?? ""] ?? fallback;
+}
+
+/**
+ * Resolves a chosen format label (as produced by buildFormatList, e.g.
+ * "MP4 · 360p" or "MP3 · Áudio") to a concrete, directly fetchable stream
+ * URL. Only reachable when ytdl.getInfo() itself succeeds — if YouTube's
+ * bot-detection blocked the earlier /api/analyze call (oEmbed fallback),
+ * there's no deciphered stream URL to download from, and this will throw.
+ */
+async function getDownloadTarget(url: string, format: string): Promise<DownloadTarget> {
+  if (!ytdl.validateURL(url)) {
+    throw new Error(
+      "Não conseguimos reconhecer esse link do YouTube. Verifique e tente novamente."
+    );
+  }
+
+  let info: ytdl.videoInfo;
+  try {
+    info = await ytdl.getInfo(url);
+  } catch (err) {
+    console.error("ytdl.getInfo failed during download:", err);
+    throw new Error(
+      "Download indisponível para este vídeo agora. Tente novamente em instantes."
+    );
+  }
+
+  const title = info.videoDetails.title;
+
+  if (format.startsWith("MP3")) {
+    const audioFormats = info.formats
+      .filter((f) => f.hasAudio && !f.hasVideo && f.url)
+      .sort((a, b) => (b.audioBitrate ?? 0) - (a.audioBitrate ?? 0));
+    const chosen = audioFormats[0];
+    if (!chosen?.url) {
+      throw new Error("Não encontramos uma faixa de áudio para este vídeo.");
+    }
+    return {
+      url: chosen.url,
+      mimeType: chosen.mimeType?.split(";")[0] ?? "audio/mp4",
+      extension: inferExtension(chosen.mimeType, "m4a"),
+      title,
+    };
+  }
+
+  const quality = format.split("·")[1]?.trim();
+  const videoFormats = info.formats.filter(
+    (f) => f.hasVideo && f.hasAudio && f.qualityLabel && f.url
+  );
+  const chosen = videoFormats.find((f) => f.qualityLabel === quality) ?? videoFormats[0];
+
+  if (!chosen?.url) {
+    throw new Error("Não encontramos esse formato para este vídeo.");
+  }
+  return {
+    url: chosen.url,
+    mimeType: chosen.mimeType?.split(";")[0] ?? "video/mp4",
+    extension: inferExtension(chosen.mimeType, "mp4"),
+    title,
+  };
+}
+
 export const youtubeProvider: Provider = {
   id: "youtube",
   label: "YouTube",
@@ -100,4 +172,5 @@ export const youtubeProvider: Provider = {
       );
     }
   },
+  getDownloadTarget,
 };
