@@ -37,6 +37,33 @@ function buildFormatList(info: ytdl.videoInfo): string[] {
   return formats.length > 0 ? formats : ["MP4 · Original"];
 }
 
+type OEmbedResponse = { title?: string };
+
+/**
+ * YouTube's public oEmbed endpoint (used for embed previews) doesn't go
+ * through the same bot-detection gate as full page/player scraping. It only
+ * exposes the title, but it's a reliable fallback when ytdl-core gets
+ * blocked ("Sign in to confirm you're not a bot") from cloud/datacenter IPs
+ * — a known limitation of any server-side YouTube extraction without an
+ * authenticated session.
+ */
+async function analyzeViaOEmbed(url: string) {
+  const res = await fetch(
+    `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+  );
+  if (!res.ok) {
+    throw new Error(`oEmbed request failed with status ${res.status}`);
+  }
+  const data = (await res.json()) as OEmbedResponse;
+  return {
+    label: "YouTube",
+    contentType: "Vídeo detectado",
+    title: data.title ?? "Vídeo do YouTube",
+    duration: "—",
+    formats: ["MP4 · Original"],
+  };
+}
+
 export const youtubeProvider: Provider = {
   id: "youtube",
   label: "YouTube",
@@ -48,25 +75,29 @@ export const youtubeProvider: Provider = {
       );
     }
 
-    let info: ytdl.videoInfo;
     try {
-      info = await ytdl.getInfo(url);
+      const info = await ytdl.getInfo(url);
+      const { videoDetails } = info;
+      const lengthSeconds = Number(videoDetails.lengthSeconds ?? 0);
+
+      return {
+        label: "YouTube",
+        contentType: "Vídeo detectado",
+        title: videoDetails.title,
+        duration: lengthSeconds > 0 ? formatDuration(lengthSeconds) : "—",
+        formats: buildFormatList(info),
+      };
     } catch (err) {
-      console.error("ytdl.getInfo failed:", err);
+      console.error("ytdl.getInfo failed, falling back to oEmbed:", err);
+    }
+
+    try {
+      return await analyzeViaOEmbed(url);
+    } catch (err) {
+      console.error("oEmbed fallback failed:", err);
       throw new Error(
         "Não foi possível obter os dados deste vídeo agora. Ele pode ser privado, restrito ou estar indisponível."
       );
     }
-
-    const { videoDetails } = info;
-    const lengthSeconds = Number(videoDetails.lengthSeconds ?? 0);
-
-    return {
-      label: "YouTube",
-      contentType: "Vídeo detectado",
-      title: videoDetails.title,
-      duration: lengthSeconds > 0 ? formatDuration(lengthSeconds) : "—",
-      formats: buildFormatList(info),
-    };
   },
 };
