@@ -1,5 +1,6 @@
 import ytdl from "@distube/ytdl-core";
 import type { DownloadTarget, Provider } from "./types";
+import { pickItem, resolveMedia, toTarget } from "./gallerydl";
 
 // Vercel's serverless functions run on a read-only filesystem. ytdl-core
 // tries to write debug/update files to disk by default, which throws
@@ -95,10 +96,9 @@ async function getDownloadTarget(url: string, format: string): Promise<DownloadT
   try {
     info = await ytdl.getInfo(url);
   } catch (err) {
-    console.error("ytdl.getInfo failed during download:", err);
-    throw new Error(
-      "Download indisponível para este vídeo agora. Tente novamente em instantes."
-    );
+    console.error("ytdl.getInfo failed during download, falling back to gallery-dl:", err);
+    const media = await resolveMedia(url);
+    return toTarget(pickItem(media, false), media.title);
   }
 
   const title = info.videoDetails.title;
